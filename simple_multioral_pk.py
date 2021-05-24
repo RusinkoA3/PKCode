@@ -1,32 +1,26 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[106]:
-
-
 # ---------------------------------------------------------------------------------------------------------------
 #
-#                   Simple_multioral_pk: Display Cp following multiple oral doses
+#                     Simple_multioral_pk: Display Cp following multiple oral doses
+#                   Simulation assumes one compartment model with first order kinetics.
 #
-#                               A. Rusinko  (5/23/2021) v1.00
+#                               A. Rusinko  (5/24/2021) v1.1
 # ---------------------------------------------------------------------------------------------------------------
 import sys
 import matplotlib.pyplot as plt
 from math import exp
 
-
-# In[159]:
-
-
 # Calculate vector of time points (x-axis)
 # Replace with equivalent from numpy
 def timevector_create(starttime, endtime, increment):
-    numpoints = int((endtime - starttime)/increment)
+    numpoints = int((endtime - starttime)/increment) +1
     #print(numpoints)
     timevalue = starttime
     timevec = [starttime]
     for i in range(1,numpoints):
-        timevalue += increment
+        timevalue += increment+0.00001
         timevec.append(timevalue)
     return timevec
        
@@ -34,15 +28,11 @@ def timevector_create(starttime, endtime, increment):
 def calculate_fraction(ka, kel, xfactor, xtime):
     fraction = xfactor * (exp(-1*kel*xtime) - exp(-1*ka*xtime))
     return fraction
-    
 
 
-# In[164]:
-
-
-# Calculate Cp given oral dose
-ka  = 0.95
-kel = 0.50                            # units (1/hr)
+# Calculate Cp given oral dose 
+ka  = 0.75
+kel = 0.10                            # units (1/hr)
 
 # Ratio used to relate ka and kel
 xfactor = ka / (ka - kel)
@@ -52,48 +42,47 @@ conc_plasma_initial = 500             # units (mcg / ml)
 
 # Dosing information
 number_doses    = 6
-dosing_interval = 10.0                 # units (hr)
+dosing_interval = 8.0                 # units (hr)
+total_time      = number_doses * dosing_interval
 
 # Get vector of time data points
 timevector       = timevector_create(0.0, dosing_interval, 0.05)
 
-# Get extra long vector of time data points for example
-long_timevector = timevector_create(0.0, 12.0, 0.05)
-                
-# Initial Dose
-conc_plasma  = [conc_plasma_initial * calculate_fraction(ka,kel,xfactor,t) for t in timevector]
-#print(len(conc_plasma))
-
+# Get extra long vector of time data points for example and calculate Cp for first dose
+long_timevector   = timevector_create(0.0, 5.0*dosing_interval, 0.05)
 conc_plasma_first = [conc_plasma_initial * calculate_fraction(ka,kel,xfactor,t) for t in long_timevector]
+                
+# Calculate Cp for length of simulation (total_time)
+total_timevector = timevector_create(0.0, total_time, 0.05) 
+#print(total_timevector[0:10], "\n")
 
-# Calculate NEW baseline concentration at dosing interval
-conc_plasma_baseline = conc_plasma_initial * calculate_fraction(ka,kel,xfactor,dosing_interval)
-#print(conc_plasma_baseline)
+# Use independent dose assumption and superposition principle
+conc_plasma = []
+for xtime in total_timevector:
+    n_doses    = int(xtime / dosing_interval) +1
+    timeindose = xtime % dosing_interval
+    #print(n_doses, xtime)
 
-
-# In[165]:
+    # Total at each time point
+    Cp_total = 0.0
+    
+    # Loop over all doses
+    for i in range(0, n_doses):
+        ttime = xtime- i*dosing_interval
+        Cp = conc_plasma_initial * calculate_fraction(ka, kel, xfactor, ttime)
+        #print(i,xtime,ttime,Cp)
+        Cp_total += Cp
+        
+    #print(Cp_total, "\n")
+    conc_plasma.append(Cp_total)
 
 
 # Display results
 fig, ax = plt.subplots()
 
 # Plot Cp for initial oral dose
-#plt.plot(timevector, conc_plasma , color='red', label='Cp Oral Dose')
-plt.plot(long_timevector, conc_plasma_first, color='red', linestyle='dashed',linewidth=0.75,alpha=0.75)
-
-for i in range(1,number_doses):
-    new_conc_plasma = [conc_plasma_baseline+(conc_plasma_initial * calculate_fraction(ka,kel,xfactor,t)) for t in timevector]
-    print(len(new_conc_plasma), len(conc_plasma))
-    conc_plasma_baseline = new_conc_plasma[-1]
-    conc_plasma.extend(new_conc_plasma)
-
-    
-total_timevector = timevector_create(0, number_doses*dosing_interval, 0.05)
-#print(total_timevector)
-#print(conc_plasma)
-  
 plt.plot(total_timevector, conc_plasma , color='red', label='Cp Oral Dose')
-
+plt.plot(long_timevector, conc_plasma_first, color='red', linestyle='dashed',linewidth=0.75,alpha=0.75)
 
 #
 #    Make the plot pretty
@@ -117,18 +106,10 @@ ax.xaxis.tick_bottom()
 plt.title("Concentration in Plasma Following Oral Dose")
 plt.xlabel("Time (hours)")
 plt.ylabel("Cp (mcg/ml)")
-plt.legend()
+#plt.legend()
 
 plt.show()
 
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
 
 
 
